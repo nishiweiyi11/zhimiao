@@ -17,9 +17,9 @@ var (
 	apiBase = "https://cloud.cn2030.com/sc/wx/HandlerSubscribe.ashx"
 
 	//cookie，抓包获取（必填）
-	Cookie = "ASP.NET_SessionId=mmzuzank0nifzzw0wiwkikkj"
+	Cookie = "ASP.NET_SessionId=anj2gvq03jc31eww5qjyvxyg"
 	//省市（必填）
-	City = "[\"山东省\",\"日照市\",\"\"]"
+	City = `["山东省","日照市",""]`
 	//该地区身份证号前6位（必填）
 	CityCode = 371100
 	//医院名称关键字，为空取第一个
@@ -47,6 +47,11 @@ var (
 )
 
 func main() {
+	//City = `["广西壮族自治州","桂林市",""]`
+	//CityCode = 450300
+	//CustomerName = "疾病预防控制"
+	//CustomerProductName = "流感病毒裂解"
+
 	var (
 		args = struct {
 			// 医院id
@@ -55,14 +60,10 @@ func main() {
 			CustomerProductId int
 			//可预约日期
 			Dates []string
+			Date  string
 			//预约id
 			MxId string
-		}{
-			CustomerId:        0,
-			CustomerProductId: 0,
-			Dates:             make([]string, 0),
-			MxId:              "",
-		}
+		}{}
 	)
 
 	//读取
@@ -141,16 +142,22 @@ func main() {
 	_ = util.WriteText(string(by), "save.json")
 
 	//查询预约时间段
-	ScDate := args.Dates[0]
+	dateIndex := 0
 	for args.MxId == "" {
+		args.Date = args.Dates[dateIndex%len(args.Dates)]
 		apiUrl := fmt.Sprintf("%s?act=GetCustSubscribeDateDetail&pid=%d&id=%d&scdate=%s",
-			apiBase, args.CustomerProductId, args.CustomerId, ScDate)
+			apiBase, args.CustomerProductId, args.CustomerId, args.Date)
 		jsonStr, err := http.Get(apiUrl).Headers(header()).Timeout(2000).Send().ReadToText()
 		if err != nil {
 			log.Println("GetCustSubscribeDateDetail error,retry...")
 			continue
 		}
 		jsonObj := util.NewJsonObject(jsonStr)
+		if jsonObj.GetArray("list").Length() == 0 {
+			log.Println("GetCustSubscribeDateDetail empty,retry...")
+			dateIndex++
+			continue
+		}
 		jsonObj.GetArray("list").ForEach(func(i int, object *util.JsonObject) {
 			if object.Get("qty").(float64) > 0 { //库存
 				args.MxId = object.Get("mxid").(string)
@@ -222,7 +229,7 @@ GetCaptcha:
 			goto GetCaptcha
 		}
 		apiUrl := fmt.Sprintf("%s?act=Save20&birthday=%s&tel=%s&sex=%d&cname=%s&doctype=1&idcard=%s&mxid=%s&date=%s&pid=7&Ftime=%d&guid=%s",
-			apiBase, user.birthday, user.tel, user.sex, url.QueryEscape(user.cname), user.idcard, args.MxId, ScDate, user.Ftime, Guid)
+			apiBase, user.birthday, user.tel, user.sex, url.QueryEscape(user.cname), user.idcard, args.MxId, args.Date, user.Ftime, Guid)
 		jsonStr, err := http.Get(apiUrl).Headers(header()).Timeout(5000).Send().ReadToText()
 		if err != nil {
 			log.Println("Save20 error,retry...")
@@ -236,7 +243,7 @@ GetCaptcha:
 			log.Println(fmt.Sprintf("Save20 error:%s,retry...", jsonObj.Get("msg")))
 			FailCount++
 			time.Sleep(1 * time.Second)
-			continue
+			goto GetCaptcha
 		}
 		fmt.Println(jsonStr)
 	}
@@ -247,8 +254,16 @@ GetCaptcha:
 	if err != nil {
 		log.Println("GetOrderStatus error,retry...")
 		time.Sleep(1 * time.Second)
+		goto GetCaptcha
 	}
 	fmt.Println(jsonStr)
+	jsonObj := util.NewJsonObject(jsonStr)
+	OrderStatus = fmt.Sprintf("%v", jsonObj.Get("status"))
+	if OrderStatus != "0" {
+		log.Println(fmt.Sprintf("GetOrderStatus:%s,retry...", jsonStr))
+		time.Sleep(1 * time.Second)
+		goto GetCaptcha
+	}
 	fmt.Println("Congratulations!!!")
 }
 
