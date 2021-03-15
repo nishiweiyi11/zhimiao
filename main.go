@@ -1,12 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/robertkrimen/otto"
 	"github.com/roseboy/httpcase/requests"
 	"github.com/roseboy/httpcase/util"
 	"log"
-	url2 "net/url"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -47,62 +48,82 @@ var (
 
 func main() {
 	var (
-		CustomerId        = 0
-		CustomerProductId = 0
-		Dates             = make([]string, 0)
-		MxId              = "" //时间段id
+		args = struct {
+			// 医院id
+			CustomerId int
+			//疫苗id
+			CustomerProductId int
+			//可预约日期
+			Dates []string
+			//预约id
+			MxId string
+		}{
+			CustomerId:        0,
+			CustomerProductId: 0,
+			Dates:             make([]string, 0),
+			MxId:              "",
+		}
 	)
 
+	//读取
+	txt, err := util.ReadText("save.json")
+	if err == nil {
+		_ = json.Unmarshal([]byte(txt), &args)
+	}
+
 	//查询地点
-	for CustomerId == 0 {
-		url := fmt.Sprintf("%s?act=CustomerList&city=%s&id=0&cityCode=%d&product=2",
-			apiBase, url2.PathEscape(City), CityCode)
-		json, err := http.Get(url).Headers(header()).Timeout(2000).Send().ReadToText()
+	for args.CustomerId == 0 {
+		apiUrl := fmt.Sprintf("%s?act=CustomerList&city=%s&id=0&cityCode=%d&product=2",
+			apiBase, url.PathEscape(City), CityCode)
+		jsonStr, err := http.Get(apiUrl).Headers(header()).Timeout(2000).Send().ReadToText()
 		if err != nil {
 			log.Println("CustomerList error,retry...")
 			continue
 		}
-		jsonObj := util.NewJsonObject(json)
+		jsonObj := util.NewJsonObject(jsonStr)
 		jsonObj.GetArray("list").ForEach(func(i int, object *util.JsonObject) {
 			if strings.Contains(object.Get("cname").(string), CustomerName) || CustomerName == "" {
-				CustomerId = int(object.Get("id").(float64))
+				args.CustomerId = int(object.Get("id").(float64))
 				fmt.Println(jsonObj.GetArray("list").GetObject(i))
 				return
 			}
 		})
 	}
-	fmt.Printf("CustomerId:%d\n", CustomerId)
+	fmt.Printf("CustomerId:%d\n", args.CustomerId)
+	by, _ := json.Marshal(args)
+	_ = util.WriteText(string(by), "save.json")
 
 	//查询疫苗以及预约时间
-	for CustomerProductId == 0 {
-		url := fmt.Sprintf("%s?act=CustomerProduct&id=%d", apiBase, CustomerId)
-		json, err := http.Get(url).Headers(header()).Timeout(2000).Send().ReadToText()
+	for args.CustomerProductId == 0 {
+		apiUrl := fmt.Sprintf("%s?act=CustomerProduct&id=%d", apiBase, args.CustomerId)
+		jsonStr, err := http.Get(apiUrl).Headers(header()).Timeout(2000).Send().ReadToText()
 		if err != nil {
 			log.Println("CustomerProduct error,retry...")
 			continue
 		}
-		jsonObj := util.NewJsonObject(json)
+		jsonObj := util.NewJsonObject(jsonStr)
 		jsonObj.GetArray("list").ForEach(func(i int, object *util.JsonObject) {
 			if strings.Contains(object.Get("text").(string), CustomerProductName) {
-				CustomerProductId = int(object.Get("id").(float64))
+				args.CustomerProductId = int(object.Get("id").(float64))
 				fmt.Println(jsonObj.GetArray("list").GetObject(i))
 				return
 			}
 		})
 	}
-	fmt.Printf("CustomerProductId:%d\n", CustomerProductId)
+	fmt.Printf("CustomerProductId:%d\n", args.CustomerProductId)
+	by, _ = json.Marshal(args)
+	_ = util.WriteText(string(by), "save.json")
 
 	//查询可预约的日期
-	for len(Dates) == 0 {
-		url := fmt.Sprintf("%s?act=GetCustSubscribeDateAll&pid=%d&id=%d&month=%d",
-			apiBase, CustomerProductId, CustomerId, Month)
-		json, err := http.Get(url).Headers(header()).Timeout(2000).Send().ReadToText()
+	for len(args.Dates) == 0 {
+		apiUrl := fmt.Sprintf("%s?act=GetCustSubscribeDateAll&pid=%d&id=%d&month=%d",
+			apiBase, args.CustomerProductId, args.CustomerId, Month)
+		jsonStr, err := http.Get(apiUrl).Headers(header()).Timeout(2000).Send().ReadToText()
 		if err != nil {
 			log.Println("GetCustSubscribeDateAll error,retry...")
 			continue
 		}
-		fmt.Println(json)
-		jsonObj := util.NewJsonObject(json)
+		jsonObj := util.NewJsonObject(jsonStr)
 		if jsonObj.GetArray("list").Length() == 0 {
 			log.Println("预约未开始...")
 			time.Sleep(1 * time.Second)
@@ -111,45 +132,49 @@ func main() {
 
 		jsonObj.GetArray("list").ForEach(func(i int, object *util.JsonObject) {
 			if object.Get("enable").(bool) {
-				Dates = append(Dates, object.Get("date").(string))
+				args.Dates = append(args.Dates, object.Get("date").(string))
 			}
 		})
 	}
-	fmt.Printf("Dates:%v\n", Dates)
+	fmt.Printf("Dates:%v\n", args.Dates)
+	by, _ = json.Marshal(args)
+	_ = util.WriteText(string(by), "save.json")
 
 	//查询预约时间段
-	ScDate := Dates[0]
-	for MxId == "" {
-		url := fmt.Sprintf("%s?act=GetCustSubscribeDateDetail&pid=%d&id=%d&scdate=%s",
-			apiBase, CustomerProductId, CustomerId, ScDate)
-		json, err := http.Get(url).Headers(header()).Timeout(2000).Send().ReadToText()
+	ScDate := args.Dates[0]
+	for args.MxId == "" {
+		apiUrl := fmt.Sprintf("%s?act=GetCustSubscribeDateDetail&pid=%d&id=%d&scdate=%s",
+			apiBase, args.CustomerProductId, args.CustomerId, ScDate)
+		jsonStr, err := http.Get(apiUrl).Headers(header()).Timeout(2000).Send().ReadToText()
 		if err != nil {
 			log.Println("GetCustSubscribeDateDetail error,retry...")
 			continue
 		}
-		jsonObj := util.NewJsonObject(json)
+		jsonObj := util.NewJsonObject(jsonStr)
 		jsonObj.GetArray("list").ForEach(func(i int, object *util.JsonObject) {
 			if object.Get("qty").(float64) > 0 { //库存
-				MxId = object.Get("mxid").(string)
+				args.MxId = object.Get("mxid").(string)
 				return
 			}
 		})
 	}
-	fmt.Printf("MxId:%v\n", MxId)
+	fmt.Printf("MxId:%v\n", args.MxId)
+	by, _ = json.Marshal(args)
+	_ = util.WriteText(string(by), "save.json")
 
 GetCaptcha:
 	//识别验证码获取guid
 	Guid := ""
 	for Guid == "" {
 		//获取验证吗
-		url := fmt.Sprintf("%s?act=GetCaptcha", apiBase)
-		json, err := http.Get(url).Headers(header()).Send().ReadToText()
+		apiUrl := fmt.Sprintf("%s?act=GetCaptcha", apiBase)
+		jsonStr, err := http.Get(apiUrl).Headers(header()).Send().ReadToText()
 		if err != nil {
 			log.Println("GetCaptcha error,retry...")
 			time.Sleep(2 * time.Second)
 			continue
 		}
-		jsonObj := util.NewJsonObject(json)
+		jsonObj := util.NewJsonObject(jsonStr)
 		if fmt.Sprintf("%v", jsonObj.Get("status")) != "0" {
 			log.Println(fmt.Sprintf("CaptchaVerify GetCaptcha:%s,retry...", jsonObj.Get("msg")))
 			time.Sleep(2 * time.Second)
@@ -158,25 +183,25 @@ GetCaptcha:
 		//fmt.Println(jsonObj)
 
 		//识别验证码
-		url = "http://127.0.0.1:8080/captcha"
-		json, err = http.Post(url).Body(json).Send().ReadToText()
+		apiUrl = "http://127.0.0.1:8080/captcha"
+		jsonStr, err = http.Post(apiUrl).Body(jsonStr).Send().ReadToText()
 		if err != nil {
 			log.Println("IdentifyVerify error,retry...")
 			time.Sleep(2 * time.Second)
 			continue
 		}
-		jsonObj = util.NewJsonObject(json)
+		jsonObj = util.NewJsonObject(jsonStr)
 		x := jsonObj.Get("x")
 
 		//提交验证码
-		url = fmt.Sprintf("%s?act=CaptchaVerify&token=&x=%v&y=%d", apiBase, x, 5)
-		json, err = http.Get(url).Headers(header()).Timeout(2000).Send().ReadToText()
+		apiUrl = fmt.Sprintf("%s?act=CaptchaVerify&token=&x=%v&y=%d", apiBase, x, 5)
+		jsonStr, err = http.Get(apiUrl).Headers(header()).Timeout(2000).Send().ReadToText()
 		if err != nil {
 			log.Println("CaptchaVerify error,retry...")
 			time.Sleep(2 * time.Second)
 			continue
 		}
-		jsonObj = util.NewJsonObject(json)
+		jsonObj = util.NewJsonObject(jsonStr)
 		if fmt.Sprintf("%v", jsonObj.Get("status")) == "408" {
 			log.Println("Cookie 失效...")
 			return
@@ -196,33 +221,34 @@ GetCaptcha:
 			FailCount = 0
 			goto GetCaptcha
 		}
-		url := fmt.Sprintf("%s?act=Save20&birthday=%s&tel=%s&sex=%d&cname=%s&doctype=1&idcard=%s&mxid=%s&date=%s&pid=7&Ftime=%d&guid=%s",
-			apiBase, user.birthday, user.tel, user.sex, url2.QueryEscape(user.cname), user.idcard, MxId, ScDate, user.Ftime, Guid)
-		json, err := http.Get(url).Headers(header()).Timeout(5000).Send().ReadToText()
+		apiUrl := fmt.Sprintf("%s?act=Save20&birthday=%s&tel=%s&sex=%d&cname=%s&doctype=1&idcard=%s&mxid=%s&date=%s&pid=7&Ftime=%d&guid=%s",
+			apiBase, user.birthday, user.tel, user.sex, url.QueryEscape(user.cname), user.idcard, args.MxId, ScDate, user.Ftime, Guid)
+		jsonStr, err := http.Get(apiUrl).Headers(header()).Timeout(5000).Send().ReadToText()
 		if err != nil {
 			log.Println("Save20 error,retry...")
 			FailCount++
 			time.Sleep(1 * time.Second)
 			continue
 		}
-		jsonObj := util.NewJsonObject(json)
-		if fmt.Sprintf("%v", jsonObj.Get("status")) != "200" {
+		jsonObj := util.NewJsonObject(jsonStr)
+		OrderStatus = fmt.Sprintf("%v", jsonObj.Get("status"))
+		if OrderStatus != "200" {
 			log.Println(fmt.Sprintf("Save20 error:%s,retry...", jsonObj.Get("msg")))
 			FailCount++
 			time.Sleep(1 * time.Second)
 			continue
 		}
-		fmt.Println(json)
+		fmt.Println(jsonStr)
 	}
 
 	//预约状态
-	url := fmt.Sprintf("%s?act=GetOrderStatus", apiBase)
-	json, err := http.Get(url).Headers(header()).Timeout(2000).Send().ReadToText()
+	apiUrl := fmt.Sprintf("%s?act=GetOrderStatus", apiBase)
+	jsonStr, err := http.Get(apiUrl).Headers(header()).Timeout(2000).Send().ReadToText()
 	if err != nil {
 		log.Println("GetOrderStatus error,retry...")
 		time.Sleep(1 * time.Second)
 	}
-	fmt.Println(json)
+	fmt.Println(jsonStr)
 	fmt.Println("Congratulations!!!")
 }
 
