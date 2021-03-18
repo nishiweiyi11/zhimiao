@@ -1,0 +1,17 @@
+{
+  "Cookie": "ASP.NET_SessionId=ydfklptyry2asl3h3okpsoon",
+  "City": "[\"广西壮族自治州\",\"桂林市\",\"\"]",
+  "CityCode": 450300,
+  "CustomerName": "桂林市疾病预防控制中心预防接种门诊",
+  "CustomerProductName": "流感病毒裂解疫苗",
+  "Month": 202103,
+  "UserInfo": {
+    "Birthday": "1996-01-01",
+    "Tel": "1885668989",
+    "Sex": 2,
+    "Cname": "王二",
+    "Ftime": 1,
+    "IdCard": "441802199601014601"
+  },
+  "BeginTime": "2021-03-19 15:29:50"
+}
