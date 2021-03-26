@@ -3,27 +3,34 @@ package main
 import (
 	"fmt"
 	"github.com/roseboy/httpcase/requests"
+	"time"
 )
 
 const auth = `Bearer eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI3NzU1MTA1IiwiaWF0IjoxNjE2NDgzNTE3LCJzdWIiOiJ7XCJzZXNzaW9uSWRcIjpcIjc3NTUxMDVcIixcInVzZXJJZFwiOjc3NTUxMDUsXCJjb2RlXCI6XCIyMDIxMDIwMTAyOTA5NzEwNDAwXCIsXCJjZWxscGhvbmVcIjpcIjE2NioqKio5ODAwXCIsXCJpZGVudGl0eUF1dGhlbnRpY2F0aW9uU3RhdHVzXCI6MSxcInJlZ2lzdGVyQ2hhbm5lbFwiOlwiMDJcIixcInBvc3BhbFVzZXJJZFwiOjEyMDE4NjYxMTQ0Mzc2MzEzMSxcIm5hbWVcIjpcIi5LXCIsXCJhY2NvdW50VHlwZVwiOlwiQ1VTVE9NRVJfVVNFUlwiLFwiaGFzaENwXCI6XCIyYmtQQTc5NVZCdjNnMUpNXCJ9IiwiZXhwIjoxNjE5MDc1NTE3fQ._CEMTuhL-TZGghmg5ANUZWgXzPrAL3I1ZqsYCL8E5m4`
 
 func main() {
-	res, _ := requests.Post("https://app.relxtech.com/api/crm/coupon/draw").
-		Body(`{"couponId":380,"activityId":64}`).Headers(headers()).Send().ReadToText()
-	fmt.Println(res)
+	var (
+		beginTimeStr = "2021-03-26 18:00:00"
+		couponIds    = []int{380, 380, 380, 381, 382, 383}
+	)
+	fmt.Println("Waiting...")
+	beginTime, _ := time.ParseInLocation("2006-01-02 15:04:05", beginTimeStr, time.Local)
+	for time.Now().Before(beginTime) {
+		time.Sleep(300 * time.Millisecond)
+	}
 
-	res, _ = requests.Post("https://app.relxtech.com/api/crm/coupon/draw").
-		Body(`{"couponId":381,"activityId":64}`).Headers(headers()).Send().ReadToText()
-	fmt.Println(res)
+	success := false
+	for !success {
+		for _, couponId := range couponIds {
+			res, _ := requests.Post("https://app.relxtech.com/api/crm/coupon/draw").
+				Body(fmt.Sprintf(`{"couponId":%d,"activityId":64}`, couponId)).Headers(headers()).
+				Send().ReadToJsonObject()
+			fmt.Println(res)
+			success = res.Get("success").(bool)
+		}
 
-	res, _ = requests.Post("https://app.relxtech.com/api/crm/coupon/draw").
-		Body(`{"couponId":382,"activityId":64}`).Headers(headers()).Send().ReadToText()
-	fmt.Println(res)
-
-	res, _ = requests.Post("https://app.relxtech.com/api/crm/coupon/draw").
-		Body(`{"couponId":383,"activityId":64}`).Headers(headers()).Send().ReadToText()
-	fmt.Println(res)
-
+		time.Sleep(300 * time.Millisecond)
+	}
 }
 
 func headers() map[string]string {
