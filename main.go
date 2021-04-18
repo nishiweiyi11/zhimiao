@@ -104,7 +104,7 @@ func main() {
 
 		if jsonObj.GetArray("list").Length() == 0 {
 			log.Println("预约未开始...")
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 			continue
 		}
 
@@ -127,6 +127,7 @@ func main() {
 	dateIndex := 0
 LabelGetMxId:
 	for args.MxId == "" {
+		time.Sleep(1 * time.Second)
 		args.Date = args.Dates[dateIndex%len(args.Dates)]
 		apiUrl := fmt.Sprintf("%s?act=GetCustSubscribeDateDetail&pid=%d&id=%d&scdate=%s",
 			apiBase, args.CustomerProductId, args.CustomerId, args.Date)
