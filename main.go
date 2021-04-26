@@ -81,12 +81,12 @@ func main() {
 	save(args, "_temp")
 
 	//获取验证码guid
-	for args.Guid == "" || time.Now().Unix()-args.GuidTime.Unix() > 30 {
-		args.Guid = GetCaptchaGuid()
-		args.GuidTime = time.Now()
-	}
-	log.Printf("GuId:%s\n", args.Guid)
-	save(args, "_temp")
+	//for args.Guid == "" || time.Now().Unix()-args.GuidTime.Unix() > 30 {
+	//	args.Guid = GetCaptchaGuid()
+	//	args.GuidTime = time.Now()
+	//}
+	//log.Printf("GuId:%s\n", args.Guid)
+	//save(args, "_temp")
 
 	//return
 
